@@ -1,23 +1,36 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
+const bodyParser = require("body-parser");
+const connectDB = require("./config/db");
+
+const userRoutes = require("./routes/users");
+const authRoutes = require("./routes/auth");
+const serviceRoutes = require("./routes/services");
+const reviewRoutes = require("./routes/reviews");
+const requestRoutes = require("./routes/requests");
+const messageRoutes = require("./routes/messages");
+
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(bodyParser.json());
+app.use(express.json());
 
-// Routes
+connectDB();
+
 app.get("/", (req, res) => {
   res.send("Bienvenue sur la plateforme d'entraide intergénérationnelle");
 });
 
-// Démarrer le serveur
-app.listen(port, () => {
-  console.log(`Le serveur écoute sur le port ${port}`);
-});
-
-const userRoutes = require("./routes/users");
 app.use("/api/users", userRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/requests", requestRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/auth", authRoutes);
+
+app.listen(port, () => {
+  console.log(`🚀 Serveur lancé sur le port ${port}`);
+});

@@ -1,14 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const UserController = require("../controllers/UserController");
 
-let users = [
-  { id: 1, name: "Alice" },
-  { id: 2, name: "Bob" },
-];
-
-// Route GET /api/users
-router.get("/", (req, res) => {
-  res.json(users);
-});
+router.get("/", UserController.getUsers);
+router.post("/", UserController.createUsers);
+router.put("/:id", UserController.updateUsers);
+router.delete("/:id", UserController.deleteUsers);
 
 module.exports = router;
