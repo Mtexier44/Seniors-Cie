@@ -9,7 +9,6 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ["etudiant", "senior"], required: true },
     phone: { type: String },
     address: { type: String },
-    rating: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

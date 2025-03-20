@@ -45,3 +45,15 @@ exports.deleteUsers = async (req, res) => {
     res.status(500).json({ message: "Erreur du serveur" });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    const users = await User.findById(req.UserId).select("-password");
+    if (!users) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -4,7 +4,8 @@ const User = require("../models/User");
 
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    console.log("Données reçues:", req.body);
+    const { firstName, lastName, email, password, role } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -14,9 +15,11 @@ exports.signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
-      name,
+      firstName,
+      lastName,
       email,
       password: hashedPassword,
+      role,
     });
 
     await newUser.save();
@@ -40,11 +43,13 @@ exports.login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
+      console.log("Utilisateur non trouvé pour l'email", email);
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      console.log("Mot de passe incorrect pour l'utilisateur", email);
       return res.status(400).json({ message: "Mot de passe incorrect" });
     }
 
@@ -57,6 +62,7 @@ exports.login = async (req, res) => {
       token,
     });
   } catch (error) {
+    console.log("Erreur serveur", error);
     res.status(500).json({ error: error.message });
   }
 };
