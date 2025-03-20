@@ -19,8 +19,8 @@ Un **système d’alerte automatique** est intégré pour détecter **une absenc
 
 ## Technologies
 
-- **Backend** : Node.js (Express) / Go / Django
-- **Frontend** : React.js / Vue.js (web), Flutter / React Native (mobile)
+- **Backend** : Node.js (Express) 
+- **Frontend** : React Native (mobile)
 - **Base de données** : PostgreSQL / MySQL
 - **Communication en temps réel** : WebSockets pour la messagerie instantanée et les alertes
 - **Geolocalisation** : Google Maps API pour la localisation des bénévoles
@@ -58,7 +58,7 @@ Les seniors peuvent laisser des évaluations et des avis après chaque intervent
 ### Prérequis
 
 - Node.js (pour le backend)
-- PostgreSQL ou MySQL (pour la base de données)
+- MongoDB (pour la base de données)
 - React.js / Vue.js (pour le frontend web)
 - Flutter / React Native (pour le frontend mobile)
 - WebSocket pour la communication en temps réel
