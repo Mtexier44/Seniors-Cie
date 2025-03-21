@@ -23,11 +23,13 @@ const RegisterScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!firstName || !lastName || !email || !password || !role) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs!");
       return;
+      setIsLoading(true);
     }
     try {
       const response = await api.post("/auth/signup", {
@@ -48,6 +50,8 @@ const RegisterScreen = () => {
     } catch (error) {
       console.log(error);
       Alert.alert("Erreur", "Une erreur est survenu");
+    } finally {
+      setIsLoading(false);
     }
   };
 

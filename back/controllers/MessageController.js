@@ -3,32 +3,49 @@ const User = require("../models/User");
 
 exports.createMessage = async (req, res) => {
   try {
-    const { sender, receiver, content } = req.body;
+    const currentUserId = req.userId;
+    const { receiver, content } = req.body;
 
-    const senderExists = await User.findById(sender);
     const receiverExists = await User.findById(receiver);
 
-    if (!senderExists || !receiverExists) {
+    if (!receiverExists) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
 
-    const newMessage = new Message({ sender, receiver, content });
+    const newMessage = new Message({
+      sender: currentUserId,
+      receiver,
+      content,
+    });
+
     await newMessage.save();
-    res
-      .status(201)
-      .json({ message: "Message envoyé avec succès", message: newMessage });
+
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate("sender", "name")
+      .populate("receiver", "name");
+    res.status(201).json({
+      message: "Message envoyé avec succès",
+      message: populatedMessage,
+    });
   } catch (error) {
+    console.error("Erreur création message:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getMessages = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const currentUserId = req.userId;
+    const { receiverId } = req.params;
+
     const messages = await Message.find({
-      $or: [{ sender: userId }, { receiver: userId }],
+      $or: [
+        { sender: currentUserId, receiverId },
+        { sender: receiverId, receiver: currentUserId },
+      ],
     })
-      .populate("sender", "name")
+      .sort({ createdAt: 1 })
+      .populate("sender", "_name")
       .populate("receiver", "name");
 
     res.status(200).json(messages);

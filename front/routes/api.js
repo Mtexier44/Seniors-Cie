@@ -1,24 +1,40 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://10.44.17.220:3000/api",
+  baseURL: "http://10.0.2.2:3000/api",
+  timeout: 15000,
 });
 
-export default api;
-
-/*import { Platform } from "react-native";
-import axios from "axios";
-const getApiUrl = () => {
-  if (Platform.OS === "android") {
-    return __DEV__
-      ? "http://10.0.2.2:3000/api" // Pour l'émulateur Android
-      : "http://192.168.56.1:3000/api"; // Pour l'appareil physique (remplacez par votre adresse IP locale)
+api.interceptors.request.use(
+  (config) => {
+    console.log("Requête envoyée à:", config.url);
+    return config;
+  },
+  (error) => {
+    console.log("Erreur avant envoi de la requête:", error);
+    return Promise.reject(error);
   }
-  return "http://localhost:3000/api"; // Pour iOS
-};
+);
 
-const api = axios.create({
-  baseURL: getApiUrl(),
-});
-
-export default api;*/
+api.interceptors.response.use(
+  (response) => {
+    console.log("Réponse reçue:", response.status);
+    return response;
+  },
+  (error) => {
+    if (error.code === "ECONNABORTED") {
+      console.log("Timeout de la requête - le serveur ne répond pas");
+    } else if (error.response) {
+      console.log("Erreur avec réponse:", error.response.status);
+    } else if (error.request) {
+      console.log("Requête envoyée mais pas de réponse reçue");
+    } else {
+      console.log(
+        "Erreur lors de la configuration de la requête:",
+        error.message
+      );
+    }
+    return Promise.reject(error);
+  }
+);
+export default api;

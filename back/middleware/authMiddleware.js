@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 
 module.exports = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]; // Récupérer le token
+  const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ message: "Accès refusé, token manquant" });
@@ -9,7 +9,8 @@ module.exports = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.UserId = decoded.UserId;
+    console.log("Token décodé:", decoded);
+    req.userId = decoded.userId;
     next();
   } catch (error) {
     res.status(401).json({ message: "Token invalide" });

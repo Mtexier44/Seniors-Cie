@@ -9,8 +9,10 @@ import {
   View,
   StyleSheet,
   Dimensions,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { overlay } from "react-native-paper";
+import ChatButton from "@/components/ChatButton";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,7 +32,7 @@ export default function Layout() {
   useEffect(() => {
     const checkLoginStatus = async () => {
       const token = await AsyncStorage.getItem("authToken");
-      setIsLoggedIn(!!token); // Si un token est présent, l'utilisateur est connecté
+      setIsLoggedIn(!!token);
     };
 
     checkLoginStatus();
@@ -39,6 +41,10 @@ export default function Layout() {
   const handleTabPress = (tabName: TabName) => {
     setActiveTab(tabName);
     router.push(`/${tabName}`);
+  };
+
+  const handleHomeClick = () => {
+    router.push("/(tabs)/home");
   };
 
   const handleProfileClick = () => {
@@ -70,10 +76,12 @@ export default function Layout() {
     <SafeAreaView style={styles.container}>
       {/* Barre supérieure avec logo et profil */}
       <View style={styles.topBar}>
-        <Image
-          source={require("@/assets/images/gerologo.png")}
-          style={styles.logo}
-        />
+        <TouchableOpacity onPress={handleHomeClick}>
+          <Image
+            source={require("@/assets/images/gerologo.png")}
+            style={styles.logo}
+          />
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleProfileClick}>
           <Image
             source={require("@/assets/images/profil.png")}
@@ -116,13 +124,17 @@ export default function Layout() {
       {/* Menu déroulant pour Connexion / Inscription */}
       {isMenuVisible && (
         <View style={styles.overlay}>
-          <View style={[styles.menu, styles.centeredMenu]}>
+          <TouchableWithoutFeedback onPress={() => setIsMenuVisible(false)}>
+            <View style={styles.overlayBackground} />
+          </TouchableWithoutFeedback>
+          <View style={styles.menu}>
             <TouchableOpacity
               onPress={handleLoginClick}
               style={styles.menuItem}
             >
               <Text style={styles.menuText}>Se connecter</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={handleRegisterClick}
               style={styles.menuItem}
@@ -153,7 +165,9 @@ export default function Layout() {
         <Tabs.Screen name="search" options={{ headerShown: false }} />
         <Tabs.Screen name="login" options={{ headerShown: false }} />
         <Tabs.Screen name="register" options={{ headerShown: false }} />
+        <Tabs.Screen name="chat" />
       </Tabs>
+      <ChatButton />
     </SafeAreaView>
   );
 }
@@ -198,15 +212,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRightWidth: 1,
     borderRightColor: "#ddd",
+    borderRadius: 10,
   },
   activeTab: {
-    backgroundColor: "#007BFF",
+    backgroundColor: "#4C88FF",
   },
   inactiveTab: {
     backgroundColor: "#f0f0f0",
   },
   tabText: {
     fontSize: 14,
+    fontWeight: "bold",
   },
   activeTabText: {
     color: "white",
@@ -215,11 +231,10 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   menu: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-    width: width * 0.8, // Largeur de la carte (80% de la largeur de l'écran)
-    maxWidth: 400, // Largeur maximale de la carte
+    backgroundColor: "#f0f0f0",
+    borderRadius: 25,
+    padding: 30,
+    width: width * 0.6, // Largeur de la carte (80% de la largeur de l'écran)
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
@@ -229,20 +244,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    justifyContent: "center",
   },
   menuItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+    padding: 15,
+    marginBottom: 15,
+    borderRadius: 30,
+    //borderBottomWidth: 1,
+    backgroundColor: "#e91e63",
+    width: "100%",
   },
   menuText: {
     fontSize: 16,
-    color: "#007BFF",
-  },
-  centeredMenu: {
-    // Style pour centrer le menu
-    left: width / 2 - 75, // Calcule la position pour centrer le menu
-    right: null, // Supprime la position à droite
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
   },
   overlay: {
     position: "absolute",
@@ -250,9 +266,16 @@ const styles = StyleSheet.create({
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0,0,0,0.5)", // Fond semi-transparent
     justifyContent: "center",
     alignItems: "center",
     zIndex: 100,
+  },
+  overlayBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
 });

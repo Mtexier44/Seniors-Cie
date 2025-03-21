@@ -14,19 +14,36 @@ exports.createUsers = async (req, res) => {
 
 exports.updateUsers = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updateUsers = await User.findByIdAndUpdate(id, req.body, {
+    console.log("Données reçues pour la mise à jour:", req.body);
+
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(400).json({ message: "Utilisateur non trouvé" });
+    }
+
+    const updateData = {};
+    Object.keys(req.body).forEach((key) => {
+      if (req.body[key] !== "" && req.body[key] !== null) {
+        updateData[key] = req.body[key];
+      }
+    });
+
+    console.log("Données filtrées pour la mise à jour:", updateData);
+
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
       new: true,
       runValidators: true,
     });
 
-    if (!updateUsers) {
+    if (!updatedUser) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
-    res.json(updateUsers);
+    res.json(updatedUser);
   } catch (error) {
     console.error("Erreur de mise à jour de l'utilisateur:", error);
-    res.status(500).json({ message: "Erreur du serveur" });
+    res
+      .status(500)
+      .json({ message: "Erreur du serveur", error: error.message });
   }
 };
 
@@ -48,7 +65,7 @@ exports.deleteUsers = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const users = await User.findById(req.UserId).select("-password");
+    const users = await User.findById(req.userId).select("-password");
     if (!users) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }

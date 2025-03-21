@@ -19,26 +19,31 @@ const LoginScreen: React.FC = () => {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs!");
       return;
     }
+
+    setIsLoading(true);
     try {
       const response = await api.post("/auth/login", { email, password });
 
-      if (response.status === 200) {
+      if (response.status === 200 && response.data.token) {
         console.log("Connexion réussie, token", response.data.token);
         await AsyncStorage.setItem("token", response.data.token);
         router.push("/(tabs)/home");
+      } else {
+        throw new Error("Réponse inattendue du serveur");
       }
     } catch (error) {
       console.error("Erreur de connexion:", error);
       Alert.alert("Erreur", "Les informations de connexions sont incorrectes.");
+    } finally {
+      setIsLoading(false);
     }
-    console.log("Connexion avec : ", email, password);
-    Alert.alert("Erreur", "Les informations de connexions sont incorrectes.");
   };
 
   return (
@@ -64,8 +69,14 @@ const LoginScreen: React.FC = () => {
               value={password}
               onChangeText={setPassword}
             />
-            <TouchableOpacity onPress={handleLogin} style={styles.button}>
-              <Text style={styles.buttonText}>Se connecter</Text>
+            <TouchableOpacity
+              onPress={handleLogin}
+              style={[styles.button, isLoading && { opacity: 0.7 }]}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? "Connexion..." : "Se connecter"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
