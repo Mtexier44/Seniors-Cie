@@ -78,6 +78,14 @@ const LoginScreen: React.FC = () => {
                 {isLoading ? "Connexion..." : "Se connecter"}
               </Text>
             </TouchableOpacity>
+            <Text style={styles.link}>
+              Déjà un compte?{" "}
+              <TouchableOpacity
+                onPress={() => router.push("/screens/RegisterScreen")}
+              >
+                <Text style={{ fontWeight: "bold" }}> S'inscrire</Text>
+              </TouchableOpacity>
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -137,6 +145,11 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  link: {
+    color: "#D81B60",
+    marginTop: 10,
+    textAlign: "center",
   },
 });
 

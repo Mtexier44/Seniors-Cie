@@ -74,3 +74,18 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Erreur récupération utilisateur:", error);
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../routes/api";
 
@@ -28,15 +28,17 @@ export default function Conversations() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchConversations();
-  }, []);
-
-  const fetchConversations = async () => {
+  // Fonction pour récupérer les conversations
+  const fetchConversations = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
+
       const token = await AsyncStorage.getItem("token");
+      console.log("Token JWT récupéré:", token);
 
       if (!token) {
         throw new Error("Token manquant");
@@ -45,18 +47,65 @@ export default function Conversations() {
       const response = await api.get("/messages/conversations", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      setConversations(response.data);
+      console.log("Réponse de l'API:", response);
+      if (Array.isArray(response.data)) {
+        console.log("Conversations récupérées:", response.data.length);
+        setConversations(response.data);
+      } else {
+        console.error("Format de réponse inattendu:", response.data);
+      }
     } catch (error) {
       console.error("Erreur lors de la récupération des conversations:", error);
-      /*Alert.alert(
-        "Erreur",
-        "Impossible de charger vos conversations. Veuillez réessayer."
-      );*/
+      // Afficher une alerte uniquement si c'est un chargement initial
+      if (showLoader) {
+        Alert.alert(
+          "Erreur",
+          "Impossible de charger vos conversations. Veuillez réessayer."
+        );
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // Chargement initial des conversations
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  // Vérifier si une mise à jour est nécessaire lorsque l'écran redevient actif
+  useFocusEffect(
+    useCallback(() => {
+      const checkForRefreshNeeded = async () => {
+        try {
+          const needsRefresh = await AsyncStorage.getItem(
+            "conversationsNeedRefresh"
+          );
+          if (needsRefresh === "true") {
+            fetchConversations(false); // Ne pas montrer le loader pour ce rafraîchissement
+            // Réinitialiser le flag après rafraîchissement
+            await AsyncStorage.setItem("conversationsNeedRefresh", "false");
+          }
+        } catch (error) {
+          console.error(
+            "Erreur lors de la vérification du besoin de rafraîchissement:",
+            error
+          );
+        }
+      };
+
+      // Vérifier au focus de l'écran
+      checkForRefreshNeeded();
+
+      // Ajouter aussi un intervalle pour rafraîchir périodiquement les conversations
+      const interval = setInterval(() => fetchConversations(false), 30000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }, [])
+  );
 
   const navigateToChat = (receiverId: string, receiverName: string) => {
     router.push({
@@ -85,6 +134,11 @@ export default function Conversations() {
     }
 
     return date.toLocaleDateString([], { day: "numeric", month: "short" });
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchConversations(false);
   };
 
   const renderItem = ({ item }: { item: Conversation }) => (
@@ -142,9 +196,9 @@ export default function Conversations() {
         <Text style={styles.title}>Messagerie</Text>
       </View>
 
-      {loading ? (
+      {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#a213af" />
+          <ActivityIndicator size="large" color="#D81B60" />
           <Text style={styles.loadingText}>
             Chargement des conversations...
           </Text>
@@ -156,7 +210,7 @@ export default function Conversations() {
           </Text>
           <TouchableOpacity
             style={styles.startButton}
-            onPress={() => router.push("/screens/users")} // Rediriger vers la liste des utilisateurs
+            onPress={() => router.push("/screens/users")}
           >
             <Text style={styles.startButtonText}>
               Démarrer une conversation
@@ -169,8 +223,18 @@ export default function Conversations() {
           renderItem={renderItem}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContainer}
-          onRefresh={fetchConversations}
-          refreshing={loading}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+          ListFooterComponent={() =>
+            loading && !refreshing ? (
+              <View style={{ padding: 10, alignItems: "center" }}>
+                <ActivityIndicator size="small" color="#D81B60" />
+                <Text style={{ marginTop: 5, color: "#666" }}>
+                  Mise à jour...
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>

@@ -9,10 +9,41 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { MessageListItem, PopulatedMessage } from "@/types/props";
 import { useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../../routes/api";
+
+// Types definition
+interface User {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+interface Message {
+  _id: string;
+  content: string;
+  sender: string | User;
+  receiver: string | User;
+  seen: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PopulatedMessage extends Omit<Message, "sender" | "receiver"> {
+  sender: User;
+  receiver: User;
+}
+
+type DateSeparator = {
+  _id: string;
+  type: "dateSeparator";
+  date: string;
+};
+
+type MessageItem = PopulatedMessage & { type: "message" };
+type MessageListItem = DateSeparator | MessageItem;
 
 const ChatScreen: React.FC = () => {
   const { receiverId, receiverName } = useLocalSearchParams<{
@@ -23,157 +54,321 @@ const ChatScreen: React.FC = () => {
   const [messages, setMessages] = useState<PopulatedMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [userId, setUserId] = useState("");
+  const [userDetails, setUserDetails] = useState<User | null>(null);
+  const [receiverDetails, setReceiverDetails] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList<MessageListItem>>(null);
+  const isFetchingRef = useRef(false);
 
-  const fetchMessages = async () => {
+  // Fetch user information
+  const fetchUserInfo = async () => {
     try {
-      setLoading(true);
+      console.log(
+        "fetchUserInfo: Début de la récupération des informations utilisateur"
+      );
       const token = await AsyncStorage.getItem("token");
-
-      if (!token || !receiverId) {
-        throw new Error("Token ou ID destinataire manquant");
+      console.log("fetchUserInfo: Token récupéré d'AsyncStorage:", token);
+      if (!token) {
+        throw new Error("Token manquant dans AsyncStorage");
       }
 
-      const response = await api.get(`/messages/conversation/${receiverId}`, {
+      console.log("fetchUserInfo: Envoi de la requête à /users/me");
+      const response = await api.get("/users/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setMessages(response.data);
+      console.log(
+        "fetchUserInfo: Réponse de l'API /users/me:",
+        JSON.stringify(response.data)
+      );
 
-      // Marquer les messages comme lus
-      await markMessagesAsSeen(response.data);
+      if (response.status !== 200) {
+        throw new Error(
+          `Erreur de l'API /users/me : Code d'état ${response.status}`
+        );
+      }
+
+      setUserId(response.data._id);
+      setUserDetails(response.data);
+      console.log(
+        "fetchUserInfo: Informations utilisateur récupérées avec succès"
+      );
     } catch (error) {
-      console.error("Erreur lors de la récupération des messages:", error);
-      Alert.alert("Erreur", "Impossible de charger les messages");
-    } finally {
-      setLoading(false);
+      console.error(
+        "fetchUserInfo: Erreur lors de la récupération des informations utilisateur:",
+        error
+      );
+      console.error("fetchUserInfo: Erreur détaillée:", error);
+      Alert.alert(
+        "Erreur",
+        "Impossible de charger votre profil. Veuillez réessayer plus tard."
+      );
     }
   };
 
+  // Fetch receiver information
+  const fetchReceiverInfo = async () => {
+    if (!receiverId) return;
+
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        throw new Error("Token missing");
+      }
+
+      const response = await api.get(`/users/${receiverId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log("Receiver details:", JSON.stringify(response.data));
+      setReceiverDetails(response.data);
+    } catch (error) {
+      console.error("Error fetching receiver info:", error);
+
+      // Create a fallback user object from URL params
+      if (receiverId && receiverName) {
+        const [firstName, lastName] = receiverName.split(" ");
+        setReceiverDetails({
+          _id: receiverId,
+          firstName: firstName || receiverName,
+          lastName: lastName || "",
+          email: "",
+        });
+      }
+    }
+  };
+
+  // Mark messages as seen
   const markMessagesAsSeen = async (msgs: PopulatedMessage[]) => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
 
-      // Trouver les messages non lus envoyés par l'autre utilisateur
+      // Find unread messages sent by the other user
       const unreadMessages = msgs.filter(
         (msg) => !msg.seen && msg.sender._id === receiverId
       );
 
-      // Marquer chaque message comme lu
+      // Mark each message as read
       for (const msg of unreadMessages) {
         await api.put(
           `/messages/${msg._id}/seen`,
           {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
+
+        console.log(`Marked message ${msg._id} as seen`);
       }
     } catch (error) {
-      console.error("Erreur lors du marquage des messages comme lus:", error);
+      console.error("Error marking messages as seen:", error);
     }
   };
 
-  const fetchUserInfo = async () => {
+  // Fetch conversation messages
+  const fetchMessages = async () => {
+    if (isFetchingRef.current || !receiverId) return;
+
     try {
+      isFetchingRef.current = true;
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
-        throw new Error("Token manquant");
+        throw new Error("Token missing");
       }
 
-      const response = await api.get("/users/me", {
+      console.log(`Fetching messages for conversation with ${receiverId}`);
+
+      const response = await api.get(`/messages/conversations/${receiverId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setUserId(response.data._id);
+      console.log("API response:", response.status);
+      console.log("Messages from API:", JSON.stringify(response.data));
+
+      if (Array.isArray(response.data)) {
+        setMessages(response.data);
+        await markMessagesAsSeen(response.data);
+      } else {
+        console.error("Unexpected response format:", response.data);
+        if (typeof response.data === "object") {
+          // If the response is an object with a messages property
+          if (response.data.messages && Array.isArray(response.data.messages)) {
+            setMessages(response.data.messages);
+            await markMessagesAsSeen(response.data.messages);
+          }
+        }
+      }
     } catch (error) {
-      console.error("Erreur lors de la récupération de l'utilisateur:", error);
+      console.error("Error fetching messages:", error);
+      if (loading) {
+        Alert.alert("Error", "Could not load messages");
+      }
+    } finally {
+      isFetchingRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  const notifyConversationsScreen = async () => {
+    try {
+      await AsyncStorage.setItem("conversationsNeedRefresh", "true");
+    } catch (error) {
+      console.error("Error notifying about update:", error);
     }
   };
 
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
     if (receiverId) {
+      console.log("Chat screen mounted for receiver:", receiverId);
       fetchUserInfo();
+      fetchReceiverInfo();
       fetchMessages();
 
-      // Rafraîchissement périodique des messages
-      const interval = setInterval(fetchMessages, 10000);
-
-      return () => clearInterval(interval);
+      interval = setInterval(() => {
+        console.log("Refreshing messages (interval)");
+        fetchMessages();
+      }, 15000);
     }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [receiverId]);
 
-  // Scroll vers le bas quand les messages changent
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 200);
     }
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) {
-      return;
-    }
+    const messageContent = newMessage.trim();
 
+    if (!messageContent) return;
     if (!receiverId) {
       Alert.alert("Erreur", "ID du destinataire manquant");
       return;
     }
+    if (!userDetails) {
+      Alert.alert(
+        "Erreur",
+        "Informations utilisateur manquantes. Veuillez réessayer plus tard."
+      );
+      return;
+    }
+
+    setNewMessage("");
 
     try {
       setSending(true);
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
-        throw new Error("Token manquant");
+        throw new Error("Token missing");
       }
+
+      const tempMsg: PopulatedMessage = {
+        _id: `temp-${Date.now()}`,
+        content: messageContent,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        seen: false,
+        sender: userDetails,
+        receiver: receiverDetails || {
+          _id: receiverId,
+          firstName: receiverName?.split(" ")[0] || "User",
+          lastName: receiverName?.split(" ")[1] || "",
+          email: "",
+        },
+      };
+
+      setMessages((prevMessages) => [...prevMessages, tempMsg]);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+
+      console.log("Sending message:", {
+        receiver: receiverId,
+        content: messageContent,
+      });
 
       const response = await api.post(
         "/messages",
-        { receiver: receiverId, content: newMessage.trim() },
+        { receiver: receiverId, content: messageContent },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Ajouter le nouveau message à la liste
-      const newMsg = response.data.message;
-      setMessages((prevMessages) => [...prevMessages, newMsg]);
-      setNewMessage("");
+      console.log("Message send API response:", JSON.stringify(response.data));
 
-      // Option: Rafraîchir tous les messages
-      fetchMessages();
+      const apiMessage = response.data.message || response.data;
+
+      if (apiMessage && apiMessage._id) {
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg._id === tempMsg._id
+              ? {
+                  ...apiMessage,
+
+                  sender: apiMessage.sender._id
+                    ? apiMessage.sender
+                    : tempMsg.sender,
+                  receiver: apiMessage.receiver._id
+                    ? apiMessage.receiver
+                    : tempMsg.receiver,
+                }
+              : msg
+          )
+        );
+      }
+
+      // Notify conversations screen to refresh
+      await notifyConversationsScreen();
+
+      // Fetch all messages to ensure sync
+      setTimeout(() => {
+        fetchMessages();
+      }, 500);
     } catch (error) {
-      console.error("Erreur lors de l'envoi du message:", error);
-      Alert.alert("Erreur", "Impossible d'envoyer le message");
+      console.error("Error sending message:", error);
+      //Alert.alert("Error", "Could not send message");
+      // Restore message to input field on error
+      setNewMessage(messageContent);
     } finally {
       setSending(false);
     }
   };
 
+  // Format time display for messages
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  // Render date separator
   const renderDateSeparator = (date: string) => (
     <View style={styles.dateSeparator}>
       <Text style={styles.dateSeparatorText}>{date}</Text>
     </View>
   );
 
-  // Fonction pour formater les messages et ajouter des séparateurs de date
+  // Format messages with date separators
   const formattedMessages = (): MessageListItem[] => {
     let currentDate = "";
     const result: MessageListItem[] = [];
 
+    console.log(`Formatting ${messages.length} messages`);
+
+    // Process each message
     messages.forEach((msg, index) => {
       const messageDate = new Date(msg.createdAt).toLocaleDateString();
 
+      // Add date separator if this is a new date
       if (messageDate !== currentDate) {
         currentDate = messageDate;
         result.push({
@@ -183,6 +378,7 @@ const ChatScreen: React.FC = () => {
         });
       }
 
+      // Add the message
       result.push({
         ...msg,
         type: "message",
@@ -192,22 +388,29 @@ const ChatScreen: React.FC = () => {
     return result;
   };
 
+  // Check for missing parameters
   if (!receiverId || !receiverName) {
     return (
       <View style={styles.centerContainer}>
-        <Text>Informations de conversation manquantes</Text>
+        <Text>Missing conversation information</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Discussion avec {receiverName}</Text>
+      <Text style={styles.header}>Chat with {receiverName}</Text>
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#a213af" />
-          <Text style={styles.loadingText}>Chargement des messages...</Text>
+          <ActivityIndicator size="large" color="#4C88FF" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
+      ) : messages.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.noMessagesText}>
+            No messages yet. Start the conversation!
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -216,25 +419,26 @@ const ChatScreen: React.FC = () => {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.messagesList}
           renderItem={({ item }) => {
+            // Handle date separator
             if (item.type === "dateSeparator" && "date" in item) {
               return renderDateSeparator(item.date);
             }
 
-            // C'est un message
+            // Handle message
             if (item.type === "message") {
+              const isMyMessage = item.sender._id === userId;
+
               return (
                 <View
                   style={[
                     styles.messageContainer,
-                    item.sender._id === userId
-                      ? styles.myMessage
-                      : styles.otherMessage,
+                    isMyMessage ? styles.myMessage : styles.otherMessage,
                   ]}
                 >
                   <Text
                     style={[
                       styles.messageText,
-                      item.sender._id === userId
+                      isMyMessage
                         ? styles.myMessageText
                         : styles.otherMessageText,
                     ]}
@@ -244,9 +448,7 @@ const ChatScreen: React.FC = () => {
                   <Text
                     style={[
                       styles.timeText,
-                      item.sender._id === userId
-                        ? styles.myTimeText
-                        : styles.otherTimeText,
+                      isMyMessage ? styles.myTimeText : styles.otherTimeText,
                     ]}
                   >
                     {formatMessageTime(item.createdAt)}
@@ -263,7 +465,7 @@ const ChatScreen: React.FC = () => {
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Écrire un message..."
+          placeholder="Écrivez votre message..."
           value={newMessage}
           onChangeText={setNewMessage}
           multiline
@@ -279,7 +481,7 @@ const ChatScreen: React.FC = () => {
           {sending ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.sendButtonText}>Envoyer</Text>
+            <Text style={styles.sendButtonText}>Send</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -302,12 +504,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: "#888",
   },
+  noMessagesText: {
+    color: "#888",
+    fontSize: 16,
+    fontStyle: "italic",
+  },
   header: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 15,
+    paddingVertical: 15,
     textAlign: "center",
-    color: "#333",
+    color: "white",
+    backgroundColor: "#D81B60",
   },
   messagesList: {
     paddingVertical: 10,
@@ -321,7 +530,7 @@ const styles = StyleSheet.create({
   },
   myMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "#a213af",
+    backgroundColor: "#D81B60",
     borderBottomRightRadius: 4,
     marginLeft: 50,
   },
@@ -370,7 +579,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   sendButton: {
-    backgroundColor: "#a213af",
+    backgroundColor: "#D81B60",
     padding: 12,
     borderRadius: 25,
     marginLeft: 10,

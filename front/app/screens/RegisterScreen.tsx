@@ -15,6 +15,7 @@ import {
 //import GenericCard from "../../components/AuthCard";
 
 import api from "../../routes/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const RegisterScreen = () => {
   const router = useRouter();
@@ -40,11 +41,13 @@ const RegisterScreen = () => {
         role,
       });
 
-      if (response.status === 201) {
+      if (response.status === 201 && response.data.token) {
+        await AsyncStorage.setItem("token", response.data.token);
         Alert.alert(
           "Inscription réussie",
           "Votre compte a été créé avec succèes"
         );
+        router.push("/(tabs)/home");
       }
       console.log("Utilisateur enregistré avec succès:", response.data);
     } catch (error) {

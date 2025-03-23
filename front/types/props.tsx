@@ -33,6 +33,15 @@ export interface PopulatedMessage {
   updatedAt: string;
 }
 
+export type apiMessage = {
+  _id: string;
+  sender: string;
+  receiver: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  seen: boolean;
+};
 // Type pour les éléments dans la liste de messages (avec séparateurs de date)
 export type MessageListItem =
   | (PopulatedMessage & { type: "message" })
